@@ -6,116 +6,185 @@
 //      PUT    /nivies/:id -> editar um nivel existente
 //      DELETE /niveis/:id -> remover um nivel
 
-// Importa o Express e o Router para definir as rotas
+// Rotas para Níveis
+
 const express = require('express');
 const router = express.Router();
 const { Op, Sequelize } = require('sequelize');
 
-// Importa os modelos
 const Nivel = require('../models/nivel');
 const Desenvolvedor = require('../models/desenvolvedor');
 
+// Validação do payload de nível
+function validarPayloadNivel(payload) {
+  const erros = {};
+  const { nivel } = payload || {};
 
-// 🟢 ROTA GET /niveis - Lista níveis com busca, paginação e contagem de devs
+  if (!nivel || !nivel.trim()) {
+    erros.nivel = 'Nivel é obrigatório';
+  }
+
+  return erros;
+}
+
+// GET /api/niveis
+// Lista níveis com busca, paginação e coluna totalDevs
 router.get('/', async (req, res) => {
   try {
-    // Parâmetros de busca e paginação
     const { nivel, page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
+
+    const pageNumber = parseInt(page, 10) || 1;
+    const limitNumber = parseInt(limit, 10) || 10;
+    const offset = (pageNumber - 1) * limitNumber;
+
     const where = {};
 
-    // Filtro por nome do nível
     if (nivel && nivel.trim() !== '') {
       where.nivel = { [Op.iLike]: `%${nivel.trim()}%` };
     }
 
-    // Consulta com contagem de desenvolvedores associados
     const resultado = await Nivel.findAndCountAll({
       where,
-      limit: parseInt(limit),
+      limit: limitNumber,
       offset,
       order: [['nivel', 'ASC']],
-      include: [{
-        model: Desenvolvedor,
-        as: 'desenvolvedores',
-        attributes: []
-      }],
       attributes: {
         include: [
-          [Sequelize.fn('COUNT', Sequelize.col('desenvolvedores.id')), 'totalDevs']
+          [
+            Sequelize.literal(`(
+              SELECT COUNT(*)
+              FROM desenvolvedores AS d
+              WHERE d.nivel_id = "Nivel"."id"
+            )`),
+            'totalDevs'
+          ]
         ]
-      },
-      group: ['Nivel.id']
+      }
     });
 
-    // Retorno paginado
-    res.json({
-      total: resultado.count.length,
-      paginas: Math.ceil(resultado.count.length / limit),
-      dados: resultado.rows
+    if (resultado.count === 0) {
+      return res.status(404).json({ mensagem: 'Nenhum nível encontrado' });
+    }
+
+    const total = resultado.count;
+    const lastPage = Math.ceil(total / limitNumber) || 1;
+
+    return res.json({
+      data: resultado.rows,
+      meta: {
+        total,
+        per_page: limitNumber,
+        current_page: pageNumber,
+        last_page: lastPage
+      }
     });
   } catch (erro) {
-    // Tratamento de erro
     console.error('Erro ao listar níveis:', erro);
-    res.status(500).json({ mensagem: 'Erro ao listar níveis', detalhe: erro.message });
+    return res.status(500).json({
+      mensagem: 'Erro ao listar níveis',
+      detalhe: erro.message
+    });
   }
 });
 
-
-// 🟢 ROTA POST /niveis - Cadastra novo nível
+// POST /api/niveis
+// Cadastra novo nível
 router.post('/', async (req, res) => {
   try {
+    const erros = validarPayloadNivel(req.body);
+
+    if (Object.keys(erros).length > 0) {
+      return res.status(400).json({
+        mensagem: 'Dados inválidos para criação de nível',
+        erros
+      });
+    }
+
     const { nivel } = req.body;
-    const novoNivel = await Nivel.create({ nivel });
-    res.status(201).json(novoNivel);
+
+    const novoNivel = await Nivel.create({
+      nivel: nivel.trim()
+    });
+
+    return res.status(201).json(novoNivel);
   } catch (erro) {
-    res.status(500).json({ mensagem: 'Erro ao criar nível', detalhe: erro.message });
+    console.error('Erro ao criar nível:', erro);
+    return res.status(500).json({
+      mensagem: 'Erro ao criar nível',
+      detalhe: erro.message
+    });
   }
 });
 
-
-// 🟢 ROTA PUT /niveis/:id - Atualiza nível existente
+// PUT /api/niveis/:id
+// Atualiza nível existente
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { nivel } = req.body;
 
     const nivelExistente = await Nivel.findByPk(id);
+
     if (!nivelExistente) {
       return res.status(404).json({ mensagem: 'Nível não encontrado' });
     }
 
-    await nivelExistente.update({ nivel });
-    res.json(nivelExistente);
+    const erros = validarPayloadNivel(req.body);
+
+    if (Object.keys(erros).length > 0) {
+      return res.status(400).json({
+        mensagem: 'Dados inválidos para atualização de nível',
+        erros
+      });
+    }
+
+    const { nivel } = req.body;
+
+    await nivelExistente.update({
+      nivel: nivel.trim()
+    });
+
+    return res.json(nivelExistente);
   } catch (erro) {
-    res.status(500).json({ mensagem: 'Erro ao atualizar nível', detalhe: erro.message });
+    console.error('Erro ao atualizar nível:', erro);
+    return res.status(500).json({
+      mensagem: 'Erro ao atualizar nível',
+      detalhe: erro.message
+    });
   }
 });
 
-
-// 🛑 ROTA DELETE /niveis/:id - Remove nível (com verificação de vínculo)
+// DELETE /api/niveis/:id
+// Remove nível se não houver desenvolvedores associados
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Verifica se há desenvolvedores vinculados
-    const devs = await Desenvolvedor.count({ where: { nivel_id: id } });
-    if (devs > 0) {
-      return res.status(400).json({ mensagem: 'Não é possível remover: nível com desenvolvedores associados.' });
+    const quantidadeDevs = await Desenvolvedor.count({
+      where: { nivel_id: id }
+    });
+
+    if (quantidadeDevs > 0) {
+      return res.status(400).json({
+        mensagem: 'Não é possível remover nível com desenvolvedores associados'
+      });
     }
 
     const nivel = await Nivel.findByPk(id);
+
     if (!nivel) {
       return res.status(404).json({ mensagem: 'Nível não encontrado' });
     }
 
     await nivel.destroy();
-    res.status(204).send();
+
+    return res.status(204).send();
   } catch (erro) {
-    res.status(500).json({ mensagem: 'Erro ao remover nível', detalhe: erro.message });
+    console.error('Erro ao remover nível:', erro);
+    return res.status(500).json({
+      mensagem: 'Erro ao remover nível',
+      detalhe: erro.message
+    });
   }
 });
 
-
-// Exporta o router
 module.exports = router;

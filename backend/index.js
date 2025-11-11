@@ -16,9 +16,10 @@ const sequelize = require('./config/database');
 // Importa os modelos para garantir que sejam registrados
 const Nivel = require('./models/nivel');
 const Desenvolvedor = require('./models/desenvolvedor');
+
+// Define associações
 Nivel.hasMany(Desenvolvedor, { foreignKey: 'nivel_id' });
 Desenvolvedor.belongsTo(Nivel, { foreignKey: 'nivel_id' });
-
 
 // Cria uma instância do Express
 const app = express();
@@ -29,36 +30,43 @@ app.use(express.json());
 // Testa a conexão com o banco de dados
 sequelize.authenticate()
   .then(() => {
-    console.log('✅ Conexão com o banco de dados estabelecida com sucesso!');
+    console.log('Conexão com o banco de dados estabelecida com sucesso');
   })
   .catch((erro) => {
-    console.error('❌ Erro ao conectar com o banco de dados:', erro);
+    console.error('Erro ao conectar com o banco de dados:', erro);
   });
 
 // Sincroniza os modelos com o banco de dados
-sequelize.sync({ alter: true }) // quando alterar o banco /models já atualiza o postgresql mas em
-  .then(() => {                 // ambientes de producao recomendo utilizar migrations para versionar
-    console.log('📦 Tabelas sincronizadas com o banco de dados');
+// Em produção, prefira migrations
+sequelize.sync({ alter: true })
+  .then(() => {
+    console.log('Tabelas sincronizadas com o banco de dados');
   })
   .catch((erro) => {
-    console.error('❌ Erro ao sincronizar tabelas:', erro);
+    console.error('Erro ao sincronizar tabelas:', erro);
   });
 
 // Define a rota para API niveis
 const rotasNiveis = require('./routes/niveis');
-app.use('/niveis', rotasNiveis);
+app.use('/api/niveis', rotasNiveis);
 
 // Define a rota para API desenvolvedores
 const rotasDesenvolvedores = require('./routes/desenvolvedores');
-app.use('/desenvolvedores', rotasDesenvolvedores);
+app.use('/api/desenvolvedores', rotasDesenvolvedores);
 
-  // Define uma rota simples para verificar se a API está funcionando
+// Rota simples para health check
 app.get('/', (req, res) => {
-  res.send('API de Desenvolvedores está rodando!');
+  res.json({
+    mensagem: 'API de Desenvolvedores está rodando',
+    endpoints: {
+      niveis: '/api/niveis',
+      desenvolvedores: '/api/desenvolvedores'
+    }
+  });
 });
 
 // Inicia o servidor na porta definida no .env ou 3001
 const PORTA = process.env.PORT || 3001;
 app.listen(PORTA, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORTA}`);
+  console.log(`Servidor rodando na porta ${PORTA}`);
 });

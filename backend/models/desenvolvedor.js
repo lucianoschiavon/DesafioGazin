@@ -42,7 +42,7 @@ const Desenvolvedor = sequelize.define('Desenvolvedor', {
     allowNull: false
   }
 }, {
-  tableName: 'desenvolvedores',   // 👈 nome correto da tabela
+  tableName: 'desenvolvedores',   // nome da tabela
   timestamps: false               // desativa createdAt/updatedAt
 });
 
