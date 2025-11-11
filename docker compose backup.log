@@ -1,0 +1,42 @@
+## Luciano Eugênio Schiavon
+## 10-11-2025 (44)99946-4300 luciano@redescorporativas.com.br
+## Começei a entender melhor como funciona a estrutura e estou trocando o 
+## caminho absoluto pelo relativo refazendo build para ficar mais organizado
+
+services:
+  banco_dados:  # Serviço do banco de dados PostgreSQL
+    image: postgres:17  # Imagem oficial do PostgreSQL versão 17
+    container_name: banco_desenvolvedores  # Nome do container
+    environment:  # Variáveis de ambiente para configurar o banco
+      POSTGRES_DB: gazin  # Nome da base de dados
+      POSTGRES_USER: postgres  # Usuário do banco
+      POSTGRES_PASSWORD: desafiogazin  # Senha do banco
+    volumes:
+      - ./database:/var/lib/postgresql/data  # Volume para persistência dos dados
+    ports:
+      - "5432:5432"  # Porta do banco de dados
+
+  backend:  # Serviço da API (Node.js)
+    build: ./backend  # Caminho para o Dockerfile do backend
+    container_name: api_desenvolvedores
+    ports:
+      - "3001:3001"  # Porta da API
+    volumes:
+      - ./backend:/app # D:\Documentos\GitHub\gazin\Desafio-FullStack\backend:/app
+    depends_on:
+      - banco_dados  # Garante que o banco suba antes da API
+    environment:
+      DATABASE_URL: postgres://postgres:desafiogazin@banco_dados:5432/gazin  # URL de conexão com o banco
+
+  frontend:  # Serviço da interface (React)
+    build: ./frontend  # Caminho para o Dockerfile do frontend
+    container_name: interface_gazin
+    ports:
+      - "3000:3000"  # Porta da interface
+    depends_on:
+      - backend  # Garante que a API suba antes da interface
+    volumes:
+      - ./frontend:/app # D:\Documentos\GitHub\gazin\Desafio-FullStack\frontend:/app
+volumes:
+  dados_postgres:  # Volume nomeado para persistência dos dados do banco
+  

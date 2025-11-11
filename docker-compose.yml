@@ -1,0 +1,48 @@
+## Luciano Eugênio Schiavon
+## 10-11-2025 (44)99946-4300 luciano@redescorporativas.com.br
+## Estrutura organizada com caminhos relativos e imagens nomeadas para reaproveitamento
+
+services:
+  banco_dados:  # Serviço do banco de dados PostgreSQL
+    image: postgres:17  # Imagem oficial do PostgreSQL versão 17
+    container_name: banco_desenvolvedores
+    environment:
+      POSTGRES_DB: gazin
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: desafiogazin
+    volumes:
+      - ./database:/var/lib/postgresql/data  # Persistência dos dados
+    ports:
+      - "5432:5432"
+
+  backend:  # Serviço da API Node.js
+    build: ./backend  # Dockerfile localizado na pasta backend
+    image: desafio-fullstack-backend  # ✅ Nome fixo para reaproveitar imagem
+    container_name: api_desenvolvedores
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app  # ✅ Hot reload com nodemon
+    depends_on:
+      - banco_dados
+    environment:
+      DATABASE_URL: postgres://postgres:desafiogazin@banco_dados:5432/gazin
+    command: npm run dev  # ✅ Executa com nodemon para reiniciar automaticamente
+
+  frontend:  # Serviço da interface React
+    build: ./frontend  # Dockerfile localizado na pasta frontend
+    image: desafio-fullstack-frontend  # ✅ Nome fixo para reaproveitar imagem
+    container_name: interface_gazin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app  # ✅ Hot reload com react-scripts
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - backend
+
+volumes:
+  dados_postgres:  # Volume nomeado para persistência do banco
