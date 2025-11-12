@@ -14,7 +14,7 @@ services:
       - ./database:/var/lib/postgresql/data  # Persistência dos dados
     ports:
       - "5432:5432"
-    healthcheck:
+    healthcheck: # aguarda o banco estar pronto antes de iniciar a API
       test: ["CMD-SHELL", "pg_isready -U postgres -d gazin"]
       interval: 5s
       timeout: 3s
@@ -38,7 +38,10 @@ services:
     command: npm run dev  # Executa com nodemon para reiniciar automaticamente
 
   frontend:  # Serviço da interface React
-    build: ./frontend  # Dockerfile localizado na pasta frontend
+    build: 
+      context:  ./frontend # Dockerfile localizado na pasta frontend
+      args: 
+        REACT_APP_API_URL: "http://localhost:3001"  # URL da API adicionada por dar erro de CORS
     image: desafio-fullstack-frontend  # Nome fixo para reaproveitar imagem
     container_name: interface_gazin
     ports:

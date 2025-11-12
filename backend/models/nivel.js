@@ -54,4 +54,11 @@ Nivel.beforeCreate((nivel, options) => {
 });
 
 // Exporta o modelo para ser usado em outros arquivos
+Nivel.associate = (models) => {
+  Nivel.hasMany(models.Desenvolvededor, {
+    as: 'Desenvolvedores',        // nome correto
+    foreignKey: 'nivel_id'        // campo que faz o relacionamento
+  });
+};
+
 module.exports = Nivel;

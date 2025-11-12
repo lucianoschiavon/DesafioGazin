@@ -10,6 +10,10 @@ RUN npm install
 
 COPY . .
 
+# Define variável de ambiente usada no build
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=${REACT_APP_API_URL}
+
 # Expõe a porta padrão do React
 EXPOSE 3000
 

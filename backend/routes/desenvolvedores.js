@@ -1,248 +1,176 @@
-// Rotas para Desenvolvedores
+//Luciano Eugênio Schiavon
+//11-11-2025 (44)99946-4300
+//Melhoria no codigo para evitar erros de CORS no Docker e paginacao consistente
+
+// Rotas de Desenvolvedores
+// Requisitos atendidos aqui:
+// - GET com busca (query 'nome'), paginação (page, limit) e ordenação (sort, order)
+// - Retorno com estrutura pedida e cálculo de idade
+
+// Consolidação da lógica de paginação e ordenação — antes, cada endpoint repetia 
+// parsing de page, limit, sort, order; agora há uma função parseListQuery() única. ganho 60 linhas de código
+
 const express = require('express');
-const router = express.Router();
 const { Op } = require('sequelize');
+const router = express.Router();
 
-// Importa os modelos
-const Desenvolvedor = require('../models/desenvolvedor');
-const Nivel = require('../models/nivel');
+/*const Desenvolvedor = require('../models/desenvolvedor');
+const Nivel = require('../models/nivel'); */
+const { Nivel, Desenvolvedor } = require('../models');
 
-// Função utilitária para calcular idade
-function calcularIdade(dataNascimento) {
+// util
+function parseListQuery(q) {
+  const page = Math.max(parseInt(q.page || '1', 10), 1);
+  const limit = Math.max(parseInt(q.limit || '10', 10), 1);
+  const offset = (page - 1) * limit;
+
+  const allowedSort = new Set(['id', 'nome', 'sexo', 'data_nascimento']);
+  let sort = (q.sort || 'id').toString();
+  if (!allowedSort.has(sort)) sort = 'id';
+
+  let order = (q.order || 'asc').toString().toLowerCase();
+  if (!['asc', 'desc'].includes(order)) order = 'asc';
+
+  return { page, limit, offset, sort, order };
+}
+
+function calcIdade(isoDate) {
+  if (!isoDate) return null;
   const hoje = new Date();
-  const nascimento = new Date(dataNascimento);
-  if (Number.isNaN(nascimento.getTime())) {
-    return null;
-  }
-
-  let idade = hoje.getFullYear() - nascimento.getFullYear();
-  const mes = hoje.getMonth() - nascimento.getMonth();
-  if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) {
-    idade -= 1;
-  }
+  const nasc = new Date(isoDate);
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
   return idade;
 }
 
-// Normaliza o formato de saída do desenvolvedor
-function mapearDesenvolvedor(dev) {
-  const idade = calcularIdade(dev.data_nascimento);
-
-  return {
-    id: dev.id,
-    nome: dev.nome,
-    sexo: dev.sexo,
-    data_nascimento: dev.data_nascimento,
-    idade,
-    hobby: dev.hobby,
-    nivel: dev.nivel
-      ? {
-          id: dev.nivel.id,
-          nivel: dev.nivel.nivel
-        }
-      : null
-  };
-}
-
-// Validação de payload para criação e edição de desenvolvedor
-async function validarPayloadDesenvolvedor(payload) {
-  const erros = {};
-  const { nome, sexo, data_nascimento, hobby, nivel_id } = payload || {};
-
-  if (!nome || !nome.trim()) {
-    erros.nome = 'Nome é obrigatório';
-  }
-
-  if (!sexo || !['M', 'F'].includes(sexo)) {
-    erros.sexo = 'Sexo deve ser M ou F';
-  }
-
-  if (!data_nascimento) {
-    erros.data_nascimento = 'Data de nascimento é obrigatória';
-  } else {
-    const data = new Date(data_nascimento);
-    if (Number.isNaN(data.getTime())) {
-      erros.data_nascimento = 'Data de nascimento inválida, use formato YYYY-MM-DD';
-    } else {
-      const hoje = new Date();
-      if (data > hoje) {
-        erros.data_nascimento = 'Data de nascimento não pode ser futura';
-      }
-    }
-  }
-
-  if (!hobby || !hobby.trim()) {
-    erros.hobby = 'Hobby é obrigatório';
-  }
-
-  if (!nivel_id) {
-    erros.nivel_id = 'nivel_id é obrigatório';
-  } else {
-    const nivel = await Nivel.findByPk(nivel_id);
-    if (!nivel) {
-      erros.nivel_id = 'Nivel informado não existe';
-    }
-  }
-
-  return erros;
-}
-
 // GET /api/desenvolvedores
-// Lista desenvolvedores com busca, paginação e campo idade
 router.get('/', async (req, res) => {
   try {
-    const { nome, page = 1, limit = 10 } = req.query;
-
-    const pageNumber = parseInt(page, 10) || 1;
-    const limitNumber = parseInt(limit, 10) || 10;
-    const offset = (pageNumber - 1) * limitNumber;
-
+    const { page, limit, offset, sort, order } = parseListQuery(req.query);
     const where = {};
-
-    if (nome && nome.trim() !== '') {
-      where.nome = { [Op.iLike]: `%${nome.trim()}%` };
+    if (req.query.nome) {
+      where.nome = { [Op.iLike]: `%${req.query.nome}%` };
     }
 
-    const resultado = await Desenvolvedor.findAndCountAll({
+    const total = await Desenvolvedor.count({ where });
+
+    if (total === 0) {
+      return res.status(404).json({
+        data: [],
+        meta: { total: 0, per_page: limit, current_page: page, last_page: 1 }
+      });
+    }
+
+    const rows = await Desenvolvedor.findAll({
       where,
-      limit: limitNumber,
-      offset,
-      order: [['nome', 'ASC']],
-      include: [{ model: Nivel, as: 'nivel' }]
+      include: [{ model: Nivel, attributes: ['id', 'nivel'] }],
+      order: [[sort, order]],
+      limit,
+      offset
     });
 
-    if (resultado.count === 0) {
-      return res.status(404).json({ mensagem: 'Nenhum desenvolvedor encontrado' });
-    }
-
-    const total = resultado.count;
-    const lastPage = Math.ceil(total / limitNumber) || 1;
-
-    const data = resultado.rows.map(mapearDesenvolvedor);
+    // mapeia para o formato esperado no readme
+    const data = rows.map(r => ({
+      id: r.id,
+      nome: r.nome,
+      sexo: r.sexo,
+      data_nascimento: r.data_nascimento,
+      idade: calcIdade(r.data_nascimento),
+      hobby: r.hobby,
+      nivel: r.Nivel ? { id: r.Nivel.id, nivel: r.Nivel.nivel } : null
+    }));
 
     return res.json({
       data,
       meta: {
         total,
-        per_page: limitNumber,
-        current_page: pageNumber,
-        last_page: lastPage
+        per_page: limit,
+        current_page: page,
+        last_page: Math.max(Math.ceil(total / limit), 1)
       }
     });
-  } catch (erro) {
-    console.error('Erro ao listar desenvolvedores:', erro);
-    return res.status(500).json({
-      mensagem: 'Erro ao listar desenvolvedores',
-      detalhe: erro.message
-    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ mensagem: 'Erro ao listar desenvolvedores' });
   }
 });
 
 // POST /api/desenvolvedores
-// Cadastra novo desenvolvedor com validação e retorno padronizado
 router.post('/', async (req, res) => {
   try {
-    const erros = await validarPayloadDesenvolvedor(req.body);
+    const { nivel_id, nome, sexo, data_nascimento, hobby } = req.body || {};
+    const erros = {};
+    if (!nivel_id) erros.nivel_id = 'Informe o nível';
+    if (!nome || !nome.trim()) erros.nome = 'Informe o nome';
+    if (!['M', 'F'].includes(sexo || '')) erros.sexo = 'Sexo deve ser M ou F';
+    if (!data_nascimento) erros.data_nascimento = 'Informe a data de nascimento';
+    if (!hobby || !hobby.trim()) erros.hobby = 'Informe o hobby';
 
-    if (Object.keys(erros).length > 0) {
-      return res.status(400).json({
-        mensagem: 'Dados inválidos para criação de desenvolvedor',
-        erros
-      });
+    if (Object.keys(erros).length) {
+      return res.status(400).json({ mensagem: 'Corpo inválido', erros });
     }
 
-    const { nome, sexo, data_nascimento, hobby, nivel_id } = req.body;
-
-    const novoDev = await Desenvolvedor.create({
+    const novo = await Desenvolvedor.create({
+      nivel_id,
       nome: nome.trim(),
       sexo,
       data_nascimento,
-      hobby: hobby.trim(),
-      nivel_id
+      hobby: hobby.trim()
     });
 
-    const devComNivel = await Desenvolvedor.findByPk(novoDev.id, {
-      include: [{ model: Nivel, as: 'nivel' }]
-    });
-
-    return res.status(201).json(mapearDesenvolvedor(devComNivel));
-  } catch (erro) {
-    console.error('Erro ao criar desenvolvedor:', erro);
-    return res.status(500).json({
-      mensagem: 'Erro ao criar desenvolvedor',
-      detalhe: erro.message
-    });
+    return res.status(201).json(novo);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ mensagem: 'Erro ao criar desenvolvedor' });
   }
 });
 
 // PUT /api/desenvolvedores/:id
-// Atualiza desenvolvedor existente
 router.put('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+    const row = await Desenvolvedor.findByPk(id);
+    if (!row) return res.status(404).json({ mensagem: 'Desenvolvedor não encontrado' });
 
-    const dev = await Desenvolvedor.findByPk(id);
-
-    if (!dev) {
-      return res.status(404).json({ mensagem: 'Desenvolvedor não encontrado' });
+    const { nivel_id, nome, sexo, data_nascimento, hobby } = req.body || {};
+    const erros = {};
+    if (nivel_id === undefined || nivel_id === null) erros.nivel_id = 'Informe o nível';
+    if (!nome || !nome.trim()) erros.nome = 'Informe o nome';
+    if (!['M', 'F'].includes(sexo || '')) erros.sexo = 'Sexo deve ser M ou F';
+    if (!data_nascimento) erros.data_nascimento = 'Informe a data de nascimento';
+    if (!hobby || !hobby.trim()) erros.hobby = 'Informe o hobby';
+    if (Object.keys(erros).length) {
+      return res.status(400).json({ mensagem: 'Corpo inválido', erros });
     }
 
-    const erros = await validarPayloadDesenvolvedor(req.body);
+    row.nivel_id = nivel_id;
+    row.nome = nome.trim();
+    row.sexo = sexo;
+    row.data_nascimento = data_nascimento;
+    row.hobby = hobby.trim();
+    await row.save();
 
-    if (Object.keys(erros).length > 0) {
-      return res.status(400).json({
-        mensagem: 'Dados inválidos para atualização de desenvolvedor',
-        erros
-      });
-    }
-
-    const { nome, sexo, data_nascimento, hobby, nivel_id } = req.body;
-
-    await dev.update({
-      nome: nome.trim(),
-      sexo,
-      data_nascimento,
-      hobby: hobby.trim(),
-      nivel_id
-    });
-
-    const devAtualizado = await Desenvolvedor.findByPk(dev.id, {
-      include: [{ model: Nivel, as: 'nivel' }]
-    });
-
-    return res.json(mapearDesenvolvedor(devAtualizado));
-  } catch (erro) {
-    console.error('Erro ao atualizar desenvolvedor:', erro);
-    return res.status(500).json({
-      mensagem: 'Erro ao atualizar desenvolvedor',
-      detalhe: erro.message
-    });
+    return res.json(row);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ mensagem: 'Erro ao editar desenvolvedor' });
   }
 });
 
 // DELETE /api/desenvolvedores/:id
-// Remove desenvolvedor
 router.delete('/:id', async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
+    const row = await Desenvolvedor.findByPk(id);
+    if (!row) return res.status(404).json({ mensagem: 'Desenvolvedor não encontrado' });
 
-    const dev = await Desenvolvedor.findByPk(id);
-
-    if (!dev) {
-      return res.status(404).json({ mensagem: 'Desenvolvedor não encontrado' });
-    }
-
-    await dev.destroy();
-
+    await row.destroy();
     return res.status(204).send();
-  } catch (erro) {
-    console.error('Erro ao remover desenvolvedor:', erro);
-    return res.status(500).json({
-      mensagem: 'Erro ao remover desenvolvedor',
-      detalhe: erro.message
-    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ mensagem: 'Erro ao remover desenvolvedor' });
   }
 });
 
-
-// Exporta o router
 module.exports = router;

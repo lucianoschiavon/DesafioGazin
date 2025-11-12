@@ -21,8 +21,19 @@ const Desenvolvedor = require('./models/desenvolvedor');
 Nivel.hasMany(Desenvolvedor, { foreignKey: 'nivel_id' });
 Desenvolvedor.belongsTo(Nivel, { foreignKey: 'nivel_id' });
 
+// Importa o CORS para permitir requisições do frontend
+const cors = require('cors');
+
 // Cria uma instância do Express
 const app = express();
+
+// Middleware para habilitar CORS (deve vir antes das rotas)
+//app.use(cors({
+//  origin: ['https://meusite.com', 'https://app.meusite.com'],
+//  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+// })); // Permite requisições apenas dessas origens em produção
+
+app.use(cors()); // Permite requisições de qualquer origem Desenvolvimento local
 
 // Middleware para permitir que a API receba dados em formato JSON
 app.use(express.json());

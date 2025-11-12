@@ -42,14 +42,8 @@ const Desenvolvedor = sequelize.define('Desenvolvedor', {
     allowNull: false
   }
 }, {
-  tableName: 'desenvolvedores',   // nome da tabela
+  tableName: 'desenvolvedores',    // nome da tabela
   timestamps: false               // desativa createdAt/updatedAt
-});
-
-// Cria a associação entre Desenvolvedor e Nivel
-Desenvolvedor.belongsTo(Nivel, {
-  foreignKey: 'nivel_id',
-  as: 'nivel'
 });
 
 // Exporta o modelo
