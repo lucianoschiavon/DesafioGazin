@@ -14,11 +14,10 @@
 
 
 const express = require('express');
-const { Op, fn, col, literal } = require('sequelize');
+const { Op, literal, col } = require('sequelize');
 const router = express.Router();
 
-/*const Nivel = require('../models/nivel');
-const Desenvolvedor = require('../models/desenvolvedor');*/
+// use o index que exporta { sequelize, Nivel, Desenvolvedor }
 const { Nivel, Desenvolvedor } = require('../models');
 
 // util: normaliza paginação e ordenação
@@ -27,17 +26,31 @@ function parseListQuery(q) {
   const limit = Math.max(parseInt(q.limit || '10', 10), 1);
   const offset = (page - 1) * limit;
 
-  // sort: id | nivel | totalDevs
   const allowedSort = new Set(['id', 'nivel', 'totalDevs']);
   let sort = (q.sort || 'id').toString();
   if (!allowedSort.has(sort)) sort = 'id';
 
-  // order: asc | desc
   let order = (q.order || 'asc').toString().toLowerCase();
   if (!['asc', 'desc'].includes(order)) order = 'asc';
 
   return { page, limit, offset, sort, order };
 }
+
+/**
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ * 
+ * @typedef {import('../types').NivelDTO} NivelDTO
+ * @typedef {import('../types').Paginado<NivelDTO>} ListaNiveis
+ * 
+ * Esta rota retorna um objeto no formato:
+ * {
+ *   data: [ { id, nivel, totalDevs } ],
+ *   meta: { total, per_page, current_page, last_page }
+ * }
+ */
+
 
 // GET /api/niveis
 router.get('/', async (req, res) => {
@@ -48,9 +61,7 @@ router.get('/', async (req, res) => {
       where.nivel = { [Op.iLike]: `%${req.query.nivel}%` };
     }
 
-    // total de registros para paginação
     const total = await Nivel.count({ where });
-
     if (total === 0) {
       return res.status(404).json({
         data: [],
@@ -58,27 +69,24 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // ordenação especial quando sort = totalDevs
-    let orderClause = [[sort === 'totalDevs' ? literal('"totalDevs"') : sort, order]];
+    // ordenação por totalDevs usa alias calculado
+    const orderClause =
+  sort === 'totalDevs'
+    ? [[literal(`(SELECT COUNT(*) FROM desenvolvedores d WHERE d.nivel_id = "Nivel"."id")`), order]]
+    : [[col(`Nivel.${sort}`), order]];
 
-    // consulta com LEFT JOIN e COUNT de devs
+    // subconsulta conta direto na tabela física desenvolvedores
     const rows = await Nivel.findAll({
       where,
-      subQuery: false,
       attributes: [
         'id',
         'nivel',
-        // COUNT(Desenvolvedores.id) AS "totalDevs"
-        [fn('COUNT', col('Desenvolvedors.id')), 'totalDevs']
+        [literal(`(
+          SELECT COUNT(*)::int
+          FROM desenvolvedores d
+          WHERE d.nivel_id = "Nivel"."id"
+        )`), 'totalDevs']
       ],
-      include: [
-        {
-          model: Desenvolvedor,
-          attributes: [],
-          required: false
-        }
-      ],
-      group: ['Nivel.id'],
       order: orderClause,
       limit,
       offset
@@ -106,7 +114,6 @@ router.post('/', async (req, res) => {
     if (!nivel || !nivel.trim()) {
       return res.status(400).json({ mensagem: 'Corpo inválido', erros: { nivel: 'Informe o nome do nível' } });
     }
-
     const novo = await Nivel.create({ nivel: nivel.trim() });
     return res.status(201).json(novo);
   } catch (err) {

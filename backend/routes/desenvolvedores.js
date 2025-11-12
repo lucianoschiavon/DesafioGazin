@@ -43,6 +43,15 @@ function calcIdade(isoDate) {
   if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
   return idade;
 }
+/**
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ * 
+ * @typedef {import('../types').DesenvolvedorDTO} DesenvolvedorDTO
+ * @typedef {import('../types').Paginado<DesenvolvedorDTO>} ListaDevs
+ */
+
 
 // GET /api/desenvolvedores
 router.get('/', async (req, res) => {
