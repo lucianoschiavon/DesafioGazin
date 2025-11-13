@@ -1,0 +1,950 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "API Cadastro de Desenvolvedores - Desafio Gazin",
+    "version": "1.0.0",
+    "description": "API RESTful para cadastro de níveis e desenvolvedores, com paginação, busca, ordenação e regras de negócio conforme enunciado do desafio."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Ambiente local (docker compose)"
+    }
+  ],
+  "paths": {
+    "/api/niveis": {
+      "get": {
+        "summary": "Listar níveis",
+        "description": "Retorna uma lista paginada de níveis. Quando não houver nenhum nível cadastrado, retorna 404 conforme enunciado.",
+        "tags": ["Níveis"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Número da página (começa em 1).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Quantidade de registros por página.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Campo de ordenação.",
+            "schema": {
+              "type": "string",
+              "enum": ["id", "nivel", "totalDevs"],
+              "default": "id"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Direção da ordenação.",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
+          },
+          {
+            "name": "nivel",
+            "in": "query",
+            "description": "Filtro por nome parcial do nível.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de níveis encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NivelListResponse"
+                },
+                "examples": {
+                  "sucesso": {
+                    "value": {
+                      "data": [
+                        {
+                          "id": 1,
+                          "nivel": "Júnior",
+                          "totalDevs": 3
+                        },
+                        {
+                          "id": 2,
+                          "nivel": "Pleno",
+                          "totalDevs": 5
+                        }
+                      ],
+                      "meta": {
+                        "total": 2,
+                        "per_page": 10,
+                        "current_page": 1,
+                        "last_page": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nenhum nível cadastrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NivelListResponse"
+                },
+                "example": {
+                  "data": [],
+                  "meta": {
+                    "total": 0,
+                    "per_page": 10,
+                    "current_page": 1,
+                    "last_page": 1
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao listar níveis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao listar níveis"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cadastrar nível",
+        "description": "Cria um novo nível.",
+        "tags": ["Níveis"],
+        "requestBody": {
+          "required": true,
+          "description": "Dados para criação de um nível.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NivelInput"
+              },
+              "example": {
+                "nivel": "Sênior"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Nível criado com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Nivel"
+                },
+                "example": {
+                  "id": 3,
+                  "nivel": "Sênior"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corpo da requisição inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Corpo inválido",
+                  "erros": {
+                    "nivel": "Informe o nome do nível"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao criar nível.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao criar nível"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/niveis/{id}": {
+      "put": {
+        "summary": "Editar nível",
+        "description": "Atualiza um nível existente pelo id.",
+        "tags": ["Níveis"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id do nível a ser atualizado.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Dados para atualização do nível.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NivelInput"
+              },
+              "example": {
+                "nivel": "Pleno"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Nível atualizado com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Nivel"
+                },
+                "example": {
+                  "id": 2,
+                  "nivel": "Pleno"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corpo da requisição inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Corpo inválido",
+                  "erros": {
+                    "nivel": "Informe o nome do nível"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nível não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Nível não encontrado"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao editar nível.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao editar nível"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remover nível",
+        "description": "Remove um nível existente pelo id. Se houver desenvolvedores associados, retorna 400.",
+        "tags": ["Níveis"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id do nível a ser removido.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Nível removido com sucesso. Sem conteúdo no corpo da resposta."
+          },
+          "400": {
+            "description": "Não é possível excluir níveis com desenvolvedores associados.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Não é possível remover o nível, existem desenvolvedores associados",
+                  "totalDevs": 3
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nível não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Nível não encontrado"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao remover nível.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao remover nível"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desenvolvedores": {
+      "get": {
+        "summary": "Listar desenvolvedores",
+        "description": "Retorna uma lista paginada de desenvolvedores com dados do nível e idade calculada. Quando não houver nenhum desenvolvedor cadastrado, retorna 404 conforme enunciado.",
+        "tags": ["Desenvolvedores"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Número da página (começa em 1).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Quantidade de registros por página.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "Campo de ordenação.",
+            "schema": {
+              "type": "string",
+              "enum": ["id", "nome", "sexo", "data_nascimento"],
+              "default": "id"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Direção da ordenação.",
+            "schema": {
+              "type": "string",
+              "enum": ["asc", "desc"],
+              "default": "asc"
+            }
+          },
+          {
+            "name": "nome",
+            "in": "query",
+            "description": "Filtro por nome parcial do desenvolvedor.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de desenvolvedores encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevListResponse"
+                },
+                "examples": {
+                  "sucesso": {
+                    "value": {
+                      "data": [
+                        {
+                          "id": 1,
+                          "nome": "Ana Silva",
+                          "sexo": "F",
+                          "data_nascimento": "1995-01-10",
+                          "idade": 29,
+                          "hobby": "Programação",
+                          "nivel": {
+                            "id": 2,
+                            "nivel": "Pleno"
+                          }
+                        }
+                      ],
+                      "meta": {
+                        "total": 1,
+                        "per_page": 10,
+                        "current_page": 1,
+                        "last_page": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nenhum desenvolvedor cadastrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevListResponse"
+                },
+                "example": {
+                  "data": [],
+                  "meta": {
+                    "total": 0,
+                    "per_page": 10,
+                    "current_page": 1,
+                    "last_page": 1
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao listar desenvolvedores.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao listar desenvolvedores"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Cadastrar desenvolvedor",
+        "description": "Cria um novo desenvolvedor vinculado a um nível.",
+        "tags": ["Desenvolvedores"],
+        "requestBody": {
+          "required": true,
+          "description": "Dados para criação do desenvolvedor.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesenvolvedorInput"
+              },
+              "example": {
+                "nivel_id": 2,
+                "nome": "Ana Silva",
+                "sexo": "F",
+                "data_nascimento": "1995-01-10",
+                "hobby": "Programação"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Desenvolvedor criado com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesenvolvedorModel"
+                },
+                "example": {
+                  "id": 1,
+                  "nivel_id": 2,
+                  "nome": "Ana Silva",
+                  "sexo": "F",
+                  "data_nascimento": "1995-01-10",
+                  "hobby": "Programação"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corpo da requisição inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Corpo inválido",
+                  "erros": {
+                    "nivel_id": "Informe o nível",
+                    "nome": "Informe o nome",
+                    "sexo": "Sexo deve ser M ou F",
+                    "data_nascimento": "Informe a data de nascimento",
+                    "hobby": "Informe o hobby"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao criar desenvolvedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao criar desenvolvedor"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desenvolvedores/{id}": {
+      "put": {
+        "summary": "Editar desenvolvedor",
+        "description": "Atualiza um desenvolvedor existente pelo id.",
+        "tags": ["Desenvolvedores"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id do desenvolvedor a ser atualizado.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Dados para atualização do desenvolvedor.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesenvolvedorInput"
+              },
+              "example": {
+                "nivel_id": 3,
+                "nome": "Ana Souza",
+                "sexo": "F",
+                "data_nascimento": "1995-01-10",
+                "hobby": "Violão"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Desenvolvedor atualizado com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesenvolvedorModel"
+                },
+                "example": {
+                  "id": 1,
+                  "nivel_id": 3,
+                  "nome": "Ana Souza",
+                  "sexo": "F",
+                  "data_nascimento": "1995-01-10",
+                  "hobby": "Violão"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Corpo da requisição inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Corpo inválido",
+                  "erros": {
+                    "nivel_id": "Informe o nível",
+                    "nome": "Informe o nome",
+                    "sexo": "Sexo deve ser M ou F",
+                    "data_nascimento": "Informe a data de nascimento",
+                    "hobby": "Informe o hobby"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Desenvolvedor não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Desenvolvedor não encontrado"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao editar desenvolvedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao editar desenvolvedor"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remover desenvolvedor",
+        "description": "Remove um desenvolvedor existente pelo id.",
+        "tags": ["Desenvolvedores"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id do desenvolvedor a ser removido.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Desenvolvedor removido com sucesso. Sem conteúdo no corpo da resposta."
+          },
+          "404": {
+            "description": "Desenvolvedor não encontrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Desenvolvedor não encontrado"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro inesperado ao remover desenvolvedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "mensagem": "Erro ao remover desenvolvedor"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Nivel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "nivel": {
+            "type": "string",
+            "example": "Pleno"
+          }
+        },
+        "required": ["id", "nivel"]
+      },
+      "NivelListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "nivel": {
+            "type": "string",
+            "example": "Pleno"
+          },
+          "totalDevs": {
+            "type": "integer",
+            "description": "Quantidade de desenvolvedores associados a este nível.",
+            "example": 3
+          }
+        },
+        "required": ["id", "nivel", "totalDevs"]
+      },
+      "NivelInput": {
+        "type": "object",
+        "properties": {
+          "nivel": {
+            "type": "string",
+            "example": "Júnior"
+          }
+        },
+        "required": ["nivel"]
+      },
+      "DesenvolvedorModel": {
+        "type": "object",
+        "description": "Modelo diretamente retornado pelo Sequelize em POST e PUT.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "nome": {
+            "type": "string",
+            "example": "Ana Silva"
+          },
+          "sexo": {
+            "type": "string",
+            "enum": ["M", "F"],
+            "example": "F"
+          },
+          "data_nascimento": {
+            "type": "string",
+            "format": "date",
+            "example": "1995-01-10"
+          },
+          "hobby": {
+            "type": "string",
+            "example": "Programação"
+          },
+          "nivel_id": {
+            "type": "integer",
+            "example": 2
+          }
+        },
+        "required": ["id", "nome", "sexo", "data_nascimento", "hobby", "nivel_id"]
+      },
+      "DesenvolvedorListItem": {
+        "type": "object",
+        "description": "Formato de desenvolvedor usado no GET /api/desenvolvedores, com idade calculada e dados do nível.",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "nome": {
+            "type": "string",
+            "example": "Ana Silva"
+          },
+          "sexo": {
+            "type": "string",
+            "enum": ["M", "F"],
+            "example": "F"
+          },
+          "data_nascimento": {
+            "type": "string",
+            "format": "date",
+            "example": "1995-01-10"
+          },
+          "idade": {
+            "type": "integer",
+            "nullable": true,
+            "example": 29
+          },
+          "hobby": {
+            "type": "string",
+            "example": "Programação"
+          },
+          "nivel": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 2
+              },
+              "nivel": {
+                "type": "string",
+                "example": "Pleno"
+              }
+            }
+          }
+        },
+        "required": ["id", "nome", "sexo", "data_nascimento", "hobby"]
+      },
+      "DesenvolvedorInput": {
+        "type": "object",
+        "properties": {
+          "nivel_id": {
+            "type": "integer",
+            "example": 2
+          },
+          "nome": {
+            "type": "string",
+            "example": "Ana Silva"
+          },
+          "sexo": {
+            "type": "string",
+            "enum": ["M", "F"],
+            "example": "F"
+          },
+          "data_nascimento": {
+            "type": "string",
+            "format": "date",
+            "example": "1995-01-10"
+          },
+          "hobby": {
+            "type": "string",
+            "example": "Programação"
+          }
+        },
+        "required": ["nivel_id", "nome", "sexo", "data_nascimento", "hobby"]
+      },
+      "PaginacaoMeta": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "example": 10
+          },
+          "per_page": {
+            "type": "integer",
+            "example": 10
+          },
+          "current_page": {
+            "type": "integer",
+            "example": 1
+          },
+          "last_page": {
+            "type": "integer",
+            "example": 1
+          }
+        },
+        "required": ["total", "per_page", "current_page", "last_page"]
+      },
+      "NivelListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NivelListItem"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginacaoMeta"
+          }
+        },
+        "required": ["data", "meta"]
+      },
+      "DevListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesenvolvedorListItem"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginacaoMeta"
+          }
+        },
+        "required": ["data", "meta"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "mensagem": {
+            "type": "string",
+            "example": "Mensagem de erro."
+          }
+        },
+        "required": ["mensagem"]
+      },
+      "ValidationErrorResponse": {
+        "type": "object",
+        "properties": {
+          "mensagem": {
+            "type": "string",
+            "example": "Corpo inválido"
+          },
+          "erros": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "example": {
+              "nome": "Informe o nome",
+              "nivel_id": "Informe o nível"
+            }
+          }
+        },
+        "required": ["mensagem", "erros"]
+      }
+    }
+  }
+}

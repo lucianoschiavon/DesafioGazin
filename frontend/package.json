@@ -11,7 +11,7 @@
   "scripts": {
     "start": "react-scripts start --watch-poll",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "test": "cross-env NODE_ENV=test jest --runInBand", 
     "eject": "react-scripts eject"
   },
   "browserslist": {
