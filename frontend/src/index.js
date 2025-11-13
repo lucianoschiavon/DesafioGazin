@@ -8,6 +8,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './styles/theme.css';
 
 // Ponto de entrada da SPA
 // Mantemos o StrictMode e renderizamos o App
