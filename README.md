@@ -373,7 +373,7 @@ Item	Descrição	Local	Status
 [x]	Organização e estrutura de pastas	🚀🎨	OK
 [x]	Reaproveitamento de código	🚀🎨	OK
 [x]	Clean Code	🚀🎨	OK
-[ ]	Arquitetura formal Clean/Onion/Hex	🚀🎨	Parcial
+[ ]	Arquitetura formal Clean/Onion/Hex	🚀🎨	Parcial Devido ao tamanho do projeto
 [x]	Testes unitários / feature	🚀🎨	OK
 [x]	Documentação código/endpoint (Swagger)	🚀🎨	OK
 
@@ -382,7 +382,7 @@ Item	Descrição	Local	Status
 [x]	Disponibilização do backend via Docker	🚀	OK
 [x]	Disponibilização do frontend via Docker	🎨	OK
 [x]	Containers backend + frontend + banco via Docker Compose	🚀🎨	OK
-[ ]	Publicação do projeto online (Render / Railway / etc.)	🚀🎨	Opcional
+[X]	Publicação do projeto online (Render / Railway / etc.)	🚀🎨	OK
 
 👨‍💻 Autor
 Luciano Eugênio Schiavon
@@ -402,4 +402,5 @@ testes automatizados
 
 documentação da API e facilidade de execução via Docker
 
-Pronto para ser clonado, subir com docker compose up -d e avaliado.
+Pronto para ser clonado, subir com docker compose up -d e avaliado. 
+se for em vps modificar localhost nas conexões para ip da maquina virtual
